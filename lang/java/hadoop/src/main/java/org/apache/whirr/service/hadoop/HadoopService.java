@@ -14,6 +14,7 @@ import com.google.common.io.Files;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Properties;
@@ -27,6 +28,7 @@ import org.apache.whirr.service.Service;
 import org.apache.whirr.service.ServiceSpec;
 import org.apache.whirr.service.Cluster.Instance;
 import org.apache.whirr.service.ClusterSpec.InstanceTemplate;
+import org.apache.whirr.service.RunUrlScript;
 import org.jclouds.compute.ComputeService;
 import org.jclouds.compute.RunNodesException;
 import org.jclouds.compute.domain.NodeMetadata;
@@ -50,9 +52,19 @@ public class HadoopService extends Service {
     String publicKey = serviceSpec.readPublicKey();
     
     // deal with user packages and autoshutdown with extra runurls
-    byte[] nnjtBootScript = RunUrlBuilder.runUrls(
-      "sun/java/install",
-      String.format("apache/hadoop/install nn,jt -c %s", serviceSpec.getProvider()));
+        ArrayList<RunUrlScript> runUrls = new ArrayList<RunUrlScript>();
+
+        runUrls.add(new RunUrlScript(
+                "cloudera-tom.s3.amazonaws.com",
+                "sun/java/install"));
+
+        runUrls.add(new RunUrlScript(
+                "cloudera-tom.s3.amazonaws.com",
+                "apache/hadoop/install",
+                "nn,jt",
+                "-c", serviceSpec.getProvider()));
+
+        byte[] nnjtBootScript = RunUrlBuilder.runUrls(runUrls);
     
     Template template = computeService.templateBuilder()
     .osFamily(OsFamily.UBUNTU)
@@ -77,11 +89,21 @@ public class HadoopService extends Service {
     InetAddress namenodePublicAddress = Iterables.getOnlyElement(node.getPublicAddresses());
     InetAddress jobtrackerPublicAddress = Iterables.getOnlyElement(node.getPublicAddresses());
     
-    byte[] slaveBootScript = RunUrlBuilder.runUrls(
-      "sun/java/install",
-      String.format("apache/hadoop/install dn,tt -n %s -j %s",
-	      namenodePublicAddress.getHostName(),
-	      jobtrackerPublicAddress.getHostName()));
+     runUrls = new ArrayList<RunUrlScript>();
+
+        runUrls.add(new RunUrlScript(
+                "cloudera-tom.s3.amazonaws.com",
+                "sun/java/install"));
+
+        runUrls.add(new RunUrlScript(
+                "cloudera-tom.s3.amazonaws.com",
+                "apache/hadoop/install",
+                "dn,tt",
+                "-n", namenodePublicAddress.getHostName(),
+                "-j", jobtrackerPublicAddress.getHostName()));
+
+
+        byte[] slaveBootScript = RunUrlBuilder.runUrls(runUrls);
 
     template = computeService.templateBuilder()
     .osFamily(OsFamily.UBUNTU)
