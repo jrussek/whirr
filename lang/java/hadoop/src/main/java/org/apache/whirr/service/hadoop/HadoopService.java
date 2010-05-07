@@ -16,7 +16,6 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.Map.Entry;
@@ -40,6 +39,9 @@ public class HadoopService extends Service {
   public static final Set<String> MASTER_ROLE = Sets.newHashSet("nn", "jt");
   public static final Set<String> WORKER_ROLE = Sets.newHashSet("dn", "tt");
 
+
+
+
   public HadoopService(ServiceSpec serviceSpec) {
     super(serviceSpec);
   }
@@ -52,19 +54,27 @@ public class HadoopService extends Service {
     String publicKey = serviceSpec.readPublicKey();
     
     // deal with user packages and autoshutdown with extra runurls
-        ArrayList<RunUrlScript> runUrls = new ArrayList<RunUrlScript>();
+    ArrayList<RunUrlScript> runUrls = new ArrayList<RunUrlScript>();
 
-        runUrls.add(new RunUrlScript(
-                "cloudera-tom.s3.amazonaws.com",
-                "sun/java/install"));
+    runUrls.addAll(getByLabel("BEFORE_JAVA"));
 
-        runUrls.add(new RunUrlScript(
-                "cloudera-tom.s3.amazonaws.com",
-                "apache/hadoop/install",
-                "nn,jt",
-                "-c", serviceSpec.getProvider()));
+    runUrls.add(new RunUrlScript(
+            "cloudera-tom.s3.amazonaws.com",
+            "sun/java/install"));
 
-        byte[] nnjtBootScript = RunUrlBuilder.runUrls(runUrls);
+    runUrls.addAll(getByLabel("AFTER_JAVA"));
+    runUrls.addAll(getByLabel("BEFORE_HADOOP"));
+
+    runUrls.add(new RunUrlScript(
+            "cloudera-tom.s3.amazonaws.com",
+            "apache/hadoop/install",
+            "nn,jt",
+            "-c", serviceSpec.getProvider()));
+
+    runUrls.addAll(getByLabel("AFTER_HADOOP"));
+    runUrls.addAll(getByLabel("DEFAULT"));
+
+    byte[] nnjtBootScript = RunUrlBuilder.runUrls(runUrls);
     
     Template template = computeService.templateBuilder()
     .osFamily(OsFamily.UBUNTU)
@@ -89,21 +99,28 @@ public class HadoopService extends Service {
     InetAddress namenodePublicAddress = Iterables.getOnlyElement(node.getPublicAddresses());
     InetAddress jobtrackerPublicAddress = Iterables.getOnlyElement(node.getPublicAddresses());
     
-     runUrls = new ArrayList<RunUrlScript>();
+    runUrls = new ArrayList<RunUrlScript>();
 
-        runUrls.add(new RunUrlScript(
+    runUrls.addAll(getByLabel("BEFORE_JAVA"));
+
+    runUrls.add(new RunUrlScript(
                 "cloudera-tom.s3.amazonaws.com",
                 "sun/java/install"));
 
-        runUrls.add(new RunUrlScript(
+    runUrls.addAll(getByLabel("AFTER_JAVA"));
+    runUrls.addAll(getByLabel("BEFORE_HADOOP"));
+
+    runUrls.add(new RunUrlScript(
                 "cloudera-tom.s3.amazonaws.com",
                 "apache/hadoop/install",
                 "dn,tt",
                 "-n", namenodePublicAddress.getHostName(),
                 "-j", jobtrackerPublicAddress.getHostName()));
 
+    runUrls.addAll(getByLabel("AFTER_HADOOP"));
+    runUrls.addAll(getByLabel("DEFAULT"));
 
-        byte[] slaveBootScript = RunUrlBuilder.runUrls(runUrls);
+    byte[] slaveBootScript = RunUrlBuilder.runUrls(runUrls);
 
     template = computeService.templateBuilder()
     .osFamily(OsFamily.UBUNTU)
