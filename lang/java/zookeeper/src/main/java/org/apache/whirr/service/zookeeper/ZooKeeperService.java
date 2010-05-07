@@ -11,9 +11,9 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import org.apache.whirr.service.ClusterSpec;
@@ -23,6 +23,7 @@ import org.apache.whirr.service.Service;
 import org.apache.whirr.service.ServiceSpec;
 import org.apache.whirr.service.Cluster.Instance;
 import org.apache.whirr.service.ClusterSpec.InstanceTemplate;
+import org.apache.whirr.service.RunUrlScript;
 import org.jclouds.compute.ComputeService;
 import org.jclouds.compute.RunNodesException;
 import org.jclouds.compute.RunScriptOnNodesException;
@@ -44,9 +45,14 @@ public class ZooKeeperService extends Service {
       
     ComputeService computeService = ComputeServiceBuilder.build(serviceSpec);
 
-    byte[] bootScript = RunUrlBuilder.runUrls(
-	"sun/java/install",
-	"apache/zookeeper/install");
+    ArrayList<RunUrlScript> runUrls = new ArrayList<RunUrlScript>();
+    runUrls.add(new RunUrlScript(
+            "cloudera-tom.s3.amazonaws.com",
+            "sun/java/install"));
+    runUrls.add(new RunUrlScript(
+            "cloudera-tom.s3.amazonaws.com",
+            "apache/zookeeper/install"));
+    byte[] bootScript = RunUrlBuilder.runUrls(runUrls);
     Template template = computeService.templateBuilder()
       .osFamily(OsFamily.UBUNTU)
       .options(runScript(bootScript)
@@ -71,8 +77,13 @@ public class ZooKeeperService extends Service {
     // Pass list of all servers in ensemble to configure script.
     // Position is significant: i-th server has id i.
     String servers = Joiner.on(' ').join(getPrivateIps(nodes));
-    byte[] configureScript = RunUrlBuilder.runUrls(
-	"apache/zookeeper/post-configure " + servers);
+
+    runUrls = new ArrayList<RunUrlScript>();
+    runUrls.add(new RunUrlScript(
+            "cloudera-tom.s3.amazonaws.com",
+            "apache/zookeeper/post-configure", servers));
+
+    byte[] configureScript = RunUrlBuilder.runUrls(runUrls);
     try {
       computeService.runScriptOnNodesWithTag(serviceSpec.getClusterName(), configureScript);
     } catch (RunScriptOnNodesException e) {
